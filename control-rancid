@@ -646,7 +646,7 @@ format_device_diffs() {
         print "====================================="
         device = $3;
         sub(/^.*\//, "", device);
-        printf "%s\n", device;
+        printf "Actual Devices:  %s\n", device;
         print "====================================="
     }
     !/^Change block:/ { print $0 }

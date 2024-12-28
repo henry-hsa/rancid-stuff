@@ -2372,6 +2372,10 @@ TOP:
 	    ProcessHistory("","","", "!\nconfig-register $config_register\n");
 	}
 
+	# Skip lines containing timestamp_write
+	next if (/^\s*timestamp_write:/);
+	next if (/[+-]\s*timestamp_write:/);
+
 	/Non-Volatile memory is in use/ && return(-1); # NvRAM is locked
 	/% Configuration buffer full, / && return(-1); # buffer is in use
 	$linecnt++;
