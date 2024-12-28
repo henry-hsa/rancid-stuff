@@ -1,0 +1,47 @@
+--- control-rancid.orig	2024-12-28 12:40:57
++++ control-rancid	2024-12-28 12:50:09
+@@ -637,24 +637,40 @@
+ # This has been different for different machines...
+ # Diff the directory and then checkin.
+ trap 'rm -fr $TMP $TMP.diff $DIR/routers.single;' 1 2 15
++
++format_device_diffs() {
++    awk '
++    BEGIN { print "" }
++    /^diff --git/ {
++        if (device != "") print "\n";
++        print "====================================="
++        device = $3;
++        sub(/^.*\//, "", device);
++        printf "%s\n", device;
++        print "====================================="
++    }
++    !/^Change block:/ { print $0 }
++    '
++}
++
+ cd $DIR
+ if [ "X$DIFFSCRIPT" = "X" ]; then
+     case $RCSSYS in
+     cvs )
+ 	cvs -f diff -u -4 -ko | sed -e '/^RCS file: /d' -e '/^--- /d' \
+-	-e '/^+++ /d' -e 's/^\([-+ ]\)/\1 /' >$TMP.diff
++        -e '/^+++ /d' -e 's/^\([-+ ]\)/\1 /' | format_device_diffs >$TMP.diff
+ 	;;
+     svn | git )
+-	$RCSSYS diff | sed -e '/^+++ /d' -e 's/^\([-+ ]\)/\1 /' >$TMP.diff
++        $RCSSYS diff | sed -e '/^+++ /d' -e 's/^\([-+ ]\)/\1 /' | format_device_diffs >$TMP.diff
+ 	;;
+     esac
+ else
+     case $RCSSYS in
+     cvs )
+-	cvs -f diff -u -4 -ko | (eval $DIFFSCRIPT) 2>&1 >$TMP.diff
++        cvs -f diff -u -4 -ko | (eval $DIFFSCRIPT) 2>&1 | format_device_diffs >$TMP.diff
+ 	;;
+     svn | git )
+-	$RCSSYS diff | (eval $DIFFSCRIPT) 2>&1 >$TMP.diff
++        $RCSSYS diff | (eval $DIFFSCRIPT) 2>&1 | format_device_diffs >$TMP.diff
+         ;;
+     esac
+ fi
