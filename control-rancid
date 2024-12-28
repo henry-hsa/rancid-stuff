@@ -685,9 +685,9 @@ fi
 
 if [ -s "$TMP.diff" ] ; then
     if [ $alt_mailrcpt -eq 1 ] ; then
-        subject="network devices configurations changes with diffs - courtesy of $mailrcpt"
+        subject="network devices configurations changes  - courtesy of $mailrcpt"
     else
-        subject="network devices configuration changes with diffs"
+        subject="network devices configuration changes"
     fi
     if [ $RCSSYS = git ] ; then
         $RCSSYS commit -am "$commitmsg"
