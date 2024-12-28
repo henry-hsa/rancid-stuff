@@ -675,121 +675,120 @@ else
     esac
 fi
 
-# Add this block to remove $TMP.diff if it has no real changes
+# Modify the grep check for changes to fix email sending
 if [ -s "$TMP.diff" ]; then
-    grep -Eq '^(\\+|\\-)' "$TMP.diff"
-    if [ $? -ne 0 ]; then
-        rm -f "$TMP.diff"
-    fi
-fi
-
-if [ -s "$TMP.diff" ] ; then
-    if [ $alt_mailrcpt -eq 1 ] ; then
-        subject="network devices configurations changes  - courtesy of $mailrcpt"
-    else
-        subject="network devices configuration changes"
-    fi
-    if [ $RCSSYS = git ] ; then
-        $RCSSYS commit -am "$commitmsg"
-    else
-        $RCSSYS commit -m "$commitmsg"
-    fi
-    if [ "X$device" != "X" ] ; then
-        subject="$GROUP/$device $subject"
-    else
-        subject="$GROUP $subject"
-    fi
-
-    # working-directory maintenance & cleanup every 100 runs
-    if [ -f "runcount" ] ; then
-        read RUNCOUNT < ./runcount
-        RUNCOUNT=`expr $RUNCOUNT + 1`
-    else
-        RUNCOUNT=1
-    fi
-    case $RCSSYS in
-    svn )
-        svn cleanup
-        ;;
-    git )
-        git push
-        if [ $RUNCOUNT -gt 100 ] ; then
-        git gc --quiet
-        RUNCOUNT=0
-        fi
-        ;;
-    esac
-    rm -f ./runcount
-    echo $RUNCOUNT > ./runcount
-
-    # Mail out the diffs (if there are any).
-    if [ -s $TMP.diff ] ; then
-        MAXSZ=${MAILSPLIT:=0}
-        if [ $MAXSZ -ne 0 ] ; then
-        BLOCKSIZE=1024; export BLOCKSIZE
-        tmpk=`perl -e "my(@S) = stat(\"$TMP.diff\"); print int(\\$S[7] / 1024);"`
-        unset BLOCKSIZE
-        if [ $tmpk -lt $MAXSZ ] ; then
-            MAXSZ=0
-        fi
-        fi
-        if [ $MAXSZ -eq 0 ] ; then
-        (
-          echo "To: $mailrcpt"
-          echo "Subject: $subject"
-          echo "$MAILHEADERS" | awk '{L = "";LN = $0;while (LN ~ /\\n/) { I = index(LN,"\\n");L = L substr(LN,0,I-1) "\n";LN = substr(LN,I+2,length(LN)-I-1);}print L LN;}'
-          echo ""
-          if [ $alt_commitmsg -eq 1 ] ; then
-            echo "Commit message: $commitmsg"
-            echo ""
-          fi
-          echo "============================="
-          echo "Configuration Changes Summary"
-          echo "============================="
-          echo ""
-          cat $TMP.diff
-        ) | $SENDMAIL -t $MAILOPTS
+    grep -E '^(\+|\-) ' "$TMP.diff" > /dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        # Continue with email sending because there are real changes
+        if [ $alt_mailrcpt -eq 1 ] ; then
+            subject="network devices configurations changes  - courtesy of $mailrcpt"
         else
-        CDIR=`pwd`
-        SDIR=${TMPDIR:=/tmp}/rancid.$GROUP.$$.mail
-        error=`mkdir $SDIR`
-        if [ $? -ne 0 ] ; then
-            echo "Could not create $SDIR directory" >&2
-            echo $error >&2
+            subject="network devices configuration changes"
+        fi
+        if [ $RCSSYS = git ] ; then
+            $RCSSYS commit -am "$commitmsg"
         else
-            cd $SDIR
-            split -b${MAXSZ}k $TMP.diff
-            nfiles=`ls | wc -l | sed -e 's/^ *//' |cut -d' ' -f1`
-            n=0
-            dt=`perl -e 'print time();'`
-            for file in `ls`; do
-            n=`expr $n + 1`
-            MSGID="<$dt.RANCID$GROUP$$${nfiles}${n}@`hostname`>"
-            (
-            echo "To: $mailrcpt"
-            echo "Subject: $n of ${nfiles}: $subject"
-            echo "Message-Id: $MSGID"
-            if [ $n -gt 1 ] ; then
-                echo "References: $LASTIDS"
+            $RCSSYS commit -m "$commitmsg"
+        fi
+        if [ "X$device" != "X" ] ; then
+            subject="$GROUP/$device $subject"
+        else
+            subject="$GROUP $subject"
+        fi
+
+        # working-directory maintenance & cleanup every 100 runs
+        if [ -f "runcount" ] ; then
+            read RUNCOUNT < ./runcount
+            RUNCOUNT=`expr $RUNCOUNT + 1`
+        else
+            RUNCOUNT=1
+        fi
+        case $RCSSYS in
+        svn )
+            svn cleanup
+            ;;
+        git )
+            git push
+            if [ $RUNCOUNT -gt 100 ] ; then
+            git gc --quiet
+            RUNCOUNT=0
             fi
-            echo "$MAILHEADERS" | awk '{L = "";LN = $0;while (LN ~ /\\n/) { I = index(LN,"\\n");L = L substr(LN,0,I-1) "\n";LN = substr(LN,I+2,length(LN)-I-1);}print L LN;}'
-            echo ""
-            if [ $alt_commitmsg -eq 1 ] ; then
+            ;;
+        esac
+        rm -f ./runcount
+        echo $RUNCOUNT > ./runcount
+
+        # Mail out the diffs (if there are any).
+        if [ -s $TMP.diff ] ; then
+            MAXSZ=${MAILSPLIT:=0}
+            if [ $MAXSZ -ne 0 ] ; then
+            BLOCKSIZE=1024; export BLOCKSIZE
+            tmpk=`perl -e "my(@S) = stat(\"$TMP.diff\"); print int(\\$S[7] / 1024);"`
+            unset BLOCKSIZE
+            if [ $tmpk -lt $MAXSZ ] ; then
+                MAXSZ=0
+            fi
+            fi
+            if [ $MAXSZ -eq 0 ] ; then
+            (
+              echo "To: $mailrcpt"
+              echo "Subject: $subject"
+              echo "$MAILHEADERS" | awk '{L = "";LN = $0;while (LN ~ /\\n/) { I = index(LN,"\\n");L = L substr(LN,0,I-1) "\n";LN = substr(LN,I+2,length(LN)-I-1);}print L LN;}'
+              echo ""
+              if [ $alt_commitmsg -eq 1 ] ; then
                 echo "Commit message: $commitmsg"
                 echo ""
-            fi
-            cat $file
+              fi
+              echo "============================="
+              echo "Configuration Changes Summary"
+              echo "============================="
+              echo ""
+              cat $TMP.diff
             ) | $SENDMAIL -t $MAILOPTS
-            LASTIDS="$LASTIDS $MSGID"
-            if [ $n -lt $nfiles]; then
-                # this just tries to make the msgs order right in MUAs
-                sleep 1
+            else
+            CDIR=`pwd`
+            SDIR=${TMPDIR:=/tmp}/rancid.$GROUP.$$.mail
+            error=`mkdir $SDIR`
+            if [ $? -ne 0 ] ; then
+                echo "Could not create $SDIR directory" >&2
+                echo $error >&2
+            else
+                cd $SDIR
+                split -b${MAXSZ}k $TMP.diff
+                nfiles=`ls | wc -l | sed -e 's/^ *//' |cut -d' ' -f1`
+                n=0
+                dt=`perl -e 'print time();'`
+                for file in `ls`; do
+                n=`expr $n + 1`
+                MSGID="<$dt.RANCID$GROUP$$${nfiles}${n}@`hostname`>"
+                (
+                echo "To: $mailrcpt"
+                echo "Subject: $n of ${nfiles}: $subject"
+                echo "Message-Id: $MSGID"
+                if [ $n -gt 1 ] ; then
+                    echo "References: $LASTIDS"
+                fi
+                echo "$MAILHEADERS" | awk '{L = "";LN = $0;while (LN ~ /\\n/) { I = index(LN,"\\n");L = L substr(LN,0,I-1) "\n";LN = substr(LN,I+2,length(LN)-I-1);}print L LN;}'
+                echo ""
+                if [ $alt_commitmsg -eq 1 ] ; then
+                    echo "Commit message: $commitmsg"
+                    echo ""
+                fi
+                cat $file
+                ) | $SENDMAIL -t $MAILOPTS
+                LASTIDS="$LASTIDS $MSGID"
+                if [ $n -lt $nfiles]; then
+                    # this just tries to make the msgs order right in MUAs
+                    sleep 1
+                fi
+                done
+                cd $CDIR
+                rm -rf $SDIR
             fi
-            done
-            cd $CDIR
-            rm -rf $SDIR
+            fi
         fi
-        fi
+    else
+        rm -f "$TMP.diff"
     fi
 fi
 
